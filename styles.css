@@ -1,0 +1,28 @@
+body {
+    font-family: Arial, sans-serif;
+    margin:5px;
+}
+
+.container {
+    display: flex;
+    flex-direction: row;
+    align-items: left;
+    justify-content: left;
+    margin-top: 10px;
+}
+
+
+
+.chart {
+    margin-left: 20px;
+    width: 600px;
+    height: 400px;
+    border: 1px solid black;
+}
+
+/* This disables the up/down spinner button for the number input fields */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}

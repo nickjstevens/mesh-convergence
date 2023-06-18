@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesh Convergence</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script src='https://cdn.plot.ly/plotly-2.24.1.min.js'></script>
+
+</head>
+<body>
+  <h1>Mesh Convergence using Richardson Extrapolation</h1>
+  <h2>Introduction</h2>
+    <p>This web app implements the Richardson Extrapolation and Grid Convergence Index method to estimate the exact value of a result from a series of discretised meshes, typically from a finite element analysis.</p>
+    <p>Enter results from coarsest to finest mesh</p>
+    <p>
+        3 values for element edge length with corresponding stress results.
+    </p>
+
+
+    
+<h2>Input</h2>
+	<div class="container">
+		<div>
+			<label for="LENGTH_1">Length 1 (coarsest):</label>
+			<input type="number" id="LENGTH_1" name="length" value="2">
+		</div>
+		<div>
+			<label for="VALUE_1">Result 1:</label>
+			<input type="number" id="VALUE_1" name="result" value="200">
+		</div>
+  </div>
+  <div class="container">
+		<div>
+			<label for="LENGTH_2">Length 2:</label>
+			<input type="number" id="LENGTH_2" name="length" value="1">
+		</div>
+		<div>
+			<label for="VALUE_2">Result 2:</label>
+			<input type="number" id="VALUE_2" name="result" value="220">
+		</div>
+  </div>
+  <div class="container">
+		<div>
+			<label for="LENGTH_3">Length 3 (finest):</label>
+			<input type="number" id="LENGTH_3" name="length" value="0.5">
+		</div>    
+		<div>
+			<label for="VALUE_3">Result 3:</label>
+			<input type="number" id="VALUE_3" name="result" value="225">
+		</div>    
+  </div>
+  <div class="container">
+		<button onclick="updateChart()">Update Chart</button>
+	</div>
+<h2>Output</h2>
+  <div class="container">
+    <p>Estimated exact value:</p>
+    <p id="f_exact_text"></p>
+  </div>
+  <div class="container">
+    <p>Lower bound 95% confidence interval: </p>
+    <p id="LB_text"></p>
+  </div>
+  <div class="container">
+    <p>Upper bound 95% confidence interval: </p>
+    <p id="UB_text"></p>
+  </div>
+  <div class="container">
+    <div class="chart" id="chart"></div>
+  </div>
+
+<h2>Checks</h2>
+  <div class="container">
+    <p>Order of convergence: </p>
+    <p id="order_text"></p>
+  </div>
+  <div class="container">
+    <p>Convergence check: </p>
+    <p id="concheck_text"></p>
+  </div>
+    <p id="conwarning_text"></p>
+    <p id="rcheck_text"></p>
+
+<h2>References</h2>
+  <p><a href="https://www.dynamore.de/de/download/papers/forum08/dokumente/I-I-03.pdf">https://www.dynamore.de/de/download/papers/forum08/dokumente/I-I-03.pdf</a></p>
+  <p><a href="https://www.grc.nasa.gov/WWW/wind/valid/tutorial/spatconv.html">https://www.grc.nasa.gov/WWW/wind/valid/tutorial/spatconv.html</a></p>
+
+      
+<h2>Credits</h2>
+  <p>Author: Nick Stevens</p>
+  <p>Last updated: June 2023</p>
+  <p>Version: 3.0</p>
+  <br>
+  <p>Comments, suggestions and feedback to nickjstevens@gmail.com</p>
+
+
+
+	<script>
+    // new code from me:
+    const FOS = 1.25;
+    function updateChart(){
+
+      //read values from the input fields
+      var LENGTH_1 = parseFloat(document.getElementById('LENGTH_1').value);
+      var LENGTH_2 = parseFloat(document.getElementById('LENGTH_2').value);
+      var LENGTH_3 = parseFloat(document.getElementById('LENGTH_3').value);
+      var VALUE_1 = parseFloat(document.getElementById('VALUE_1').value);
+      var VALUE_2 = parseFloat(document.getElementById('VALUE_2').value);
+      var VALUE_3 = parseFloat(document.getElementById('VALUE_3').value);
+
+      // element edge length refinement ratio, r
+      var r_12 = LENGTH_1 / LENGTH_2;
+      var r_23 = LENGTH_2 / LENGTH_3;
+        
+      // relative error, e
+      var e_12 = Math.abs((VALUE_1 - VALUE_2)/VALUE_2);
+      var e_23 = Math.abs((VALUE_2 - VALUE_3)/VALUE_3);
+        
+      // change in value, df
+      var df_12 = VALUE_1 - VALUE_2;
+      var df_23 = VALUE_2 - VALUE_3;
+        
+      // initial guess, q(p)
+      var qp = 0.0;
+
+      // loop to calculate mesh convergence
+
+      var n = 1;
+      var error = 9999;
+      var warn = false;
+
+      while (error > 0.0001) {
+        // order of convergence, p
+        var p = Math.abs(Math.log(Math.abs(df_12 / df_23)) + qp) / Math.log(r_23);
+
+        // sign, s
+        var s;
+        if (df_12 / df_23 < 0) {
+          s = -1;
+        } else if (df_12 / df_23 > 0) {
+          s = 1;
+        } else {
+          s = 0;
+        }
+
+        // grid convergence index, gci
+        var gci_12 = FOS * (Math.abs((VALUE_1 - VALUE_2) / VALUE_2) / (Math.pow(r_12, p) - 1));
+        var gci_23 = FOS * (Math.abs((VALUE_2 - VALUE_3) / VALUE_3) / (Math.pow(r_23, p) - 1));
+
+        // convergence check
+        var c_check = gci_12 / (Math.pow(r_23, p) * gci_23);
+
+        // 95% confidence intervals
+        var ci_lb = VALUE_3 * (1 - gci_23);
+        var ci_ub = VALUE_3 * (1 + gci_23);
+
+        // estimate of exact solution, f.exact
+        var f_exact = (Math.pow(r_23, p) * VALUE_3 - VALUE_2) / (Math.pow(r_23, p) - 1);
+
+        // q(p)
+        var qp_actual = Math.log(((Math.pow(r_23, p) - s) / (Math.pow(r_12, p) - s)));
+
+        // iterative error - minimize this
+        error = Math.abs(qp - qp_actual) * 1000000;
+
+        qp = qp_actual;
+        n += 1;
+        if (n === 10000) {
+          document.getElementById("f_exact_text").innerHTML = 'ERROR - convergence not achieved';
+          warn = true;
+          break;
+        }
+      }
+
+      if (warn === false) {
+      // output data
+      document.getElementById("f_exact_text").innerHTML = f_exact.toFixed(5);
+      document.getElementById("LB_text").innerHTML = ci_lb.toFixed(5);
+      document.getElementById("UB_text").innerHTML = ci_ub.toFixed(5);
+
+      // checks
+      document.getElementById("order_text").innerHTML = p.toFixed(3);
+      document.getElementById("concheck_text").innerHTML = c_check.toFixed(3);
+
+      if (Math.min(r_12, r_23) < 1.3) {
+        document.getElementById("rcheck_text").innerHTML = "WARNING - factor between element edge lengths is less than 1.3. The extrapolation results may be inaccurate";
+      } else {
+        document.getElementById("rcheck_text").innerHTML = "";
+      }
+
+      if (c_check > 1.1 || c_check < 0.9) {
+        document.getElementById("conwarning_text").innerHTML = "WARNING - convergence check should be close to 1.0, but isn't in this case and therefore your solution may not be converging";
+      } else {
+        document.getElementById("conwarning_text").innerHTML = "";
+      }
+
+      // Plotly
+      const plotData = [
+        {
+          x: [LENGTH_1, LENGTH_2, LENGTH_3],
+          y: [VALUE_1, VALUE_2, VALUE_3],
+          text: ['Coarsest Mesh', 'Medium Mesh', 'Finest Mesh'],
+          mode: 'markers',
+          name: ''
+        },
+        {
+          x: [0],
+          y: [f_exact],
+          error_y: {
+            type: 'data',
+            symmetric: false,
+            array: [ci_ub - f_exact],
+            arrayminus: [f_exact - ci_lb]
+          },
+          text: ['Estimated Exact Value'],
+          mode: 'markers',
+          name: ''
+        }
+      ];
+
+      const plotLayout = {
+        title: 'Plot of Grid Convergence Index',
+        hovermode: 'closest',
+        xaxis: {
+          title: 'Element Edge Length',
+          ticklen: 5,
+          zeroline: false,
+          gridwidth: 2
+        },
+        yaxis: {
+          title: 'Result Value',
+          ticklen: 5,
+          gridwidth: 2
+        },
+        showlegend: false
+      };
+
+      Plotly.newPlot("chart", plotData, plotLayout);
+
+
+    }
+
+    }
+
+  
+	</script>
+
+</body>
+</html>
+
